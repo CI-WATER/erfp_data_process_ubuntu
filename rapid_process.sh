@@ -13,4 +13,4 @@ export PATH=$PATH:/home/$NAME/installz/netcdf-3.6.3-install/bin
 #start tethys virtualenv
 . /usr/lib/tethys/bin/activate
 #run script from python
-/usr/lib/tethys/bin/python /home/$NAME/work/scripts/rapid/rapid_process_async_ubuntu.py 1> /home/$NAME/work/logs/ecmwf_rapid_process_$NOW.log 2>&1
+/usr/lib/tethys/bin/python /home/$NAME/work/scripts/erfp_data_process_ubuntu/rapid_process_async_ubuntu.py 1> /home/$NAME/work/logs/ecmwf_rapid_process_$NOW.log 2>&1
