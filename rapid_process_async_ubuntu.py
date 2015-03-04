@@ -17,24 +17,18 @@ from dataset_upload import erpf_dataset_manager
 #------------------------------------------------------------------------------
 #functions
 #------------------------------------------------------------------------------
-def find_current_rapid_output(path_to_watershed_files, basin_name, current_date):
+def find_current_rapid_output(forecast_directory, basin_name):
     """
     Finds the most current files output from RAPID
     """
-    #check if there are any from 12 hours ago
-    past_date = datetime.datetime.strptime(current_date[:11],"%Y%m%d.%H") - \
-        datetime.timedelta(0,12*60*60)
-    past_hour = '1200' if past_date.hour > 11 else '0'
-    path_to_files = os.path.join(path_to_watershed_files, 
-        past_date.strftime("%Y%m%d")+'.'+past_hour)
-    if os.path.exists(path_to_files):
-        basin_files = glob(os.path.join(path_to_files,"*"+basin_name+"*.nc"))
+    if os.path.exists(forecast_directory):
+        basin_files = glob(os.path.join(forecast_directory,"*"+basin_name+"*.nc"))
         if len(basin_files) >0:
             return basin_files
     #there are none found
     return None
 
-def compute_initial_rapid_flows(basin_ensemble_files, basin_name, input_directory, output_directory):
+def compute_initial_rapid_flows(basin_ensemble_files, basin_name, input_directory, forecast_date_timestep):
     """
     Gets mean of all 52 ensembles 12-hrs ago and prints to csv as initial flow
     Qinit_file (BS_opt_Qinit)
@@ -42,9 +36,18 @@ def compute_initial_rapid_flows(basin_ensemble_files, basin_name, input_director
     The assumptions are that Qinit_file is ordered the same way as rapid_connect_file, 
     and that Qfinal_file (produced when RAPID runs) is ordered the same way as your riv_bas_id_file.  
     """
-    init_file_location = os.path.join(output_directory,'Qinit_file_'+basin_name+'.csv')
-    #check to see if exists and only perform operation once
-    if not os.path.exists(init_file_location) and basin_ensemble_files:
+    #remove old init files for this basin
+    past_init_flow_files = glob(os.path.join(input_directory, 'Qinit_file_%s_*.csv' % basin_name))
+    for past_init_flow_file in past_init_flow_files:
+        try:
+            os.remove(past_init_flow_file)
+        except:
+            pass
+
+
+    init_file_location = os.path.join(input_directory,'Qinit_file_%s_%s.csv' % (basin_name, forecast_date_timestep))
+    #check to see if basin ensemble files exist
+    if basin_ensemble_files:
         #collect data into matrix
         all_data_series = []
         reach_ids = []
@@ -119,7 +122,7 @@ def update_namelist_file(namelist_file, output_directory, vlat_file,
             new_file.write('ZS_TauR            = ' + str(interval) + '\n')
         elif 'Qinit_file' in line:
             if (qinit_file):
-                new_file.write('Qinit_file          = \'../../rapid/output/' + \
+                new_file.write('Qinit_file          = \'../../rapid/input/' + \
                     qinit_file + '\'\n')
             else:
                 new_file.write('Qinit_file          = \'\'\n')
@@ -162,10 +165,6 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
 
         lock.acquire() #make sure no overlap occurs
         print "Lock Aquired %s %s %s" % (watershed, basin_name, ensemble_number)
-        #prepare rapid initial flows
-        basin_files = find_current_rapid_output(os.path.join(rapid_files_location, 
-            'output', watershed), basin_name, forecast_date_timestep)
-        compute_initial_rapid_flows(basin_files, basin_name, input_directory, output_directory)    
         #remove link to old RAPID namelist file
         old_namelist_file = os.path.join(rapid_files_location,
             'run','rapid_namelist')
@@ -184,9 +183,15 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
                 
             qout_fpath = '%s/%s/Qout_%s_%s.nc' % (watershed, forecast_date_timestep, 
                                                   basin_name, ensemble_number)
-            if (basin_files):
-                qinit_fpath = '%s/%s/Qinit_file_%s.csv' % (watershed, forecast_date_timestep, 
-                                                           basin_name)
+            #check for qinit file
+            past_date = datetime.datetime.strptime(forecast_date_timestep[:11],"%Y%m%d.%H") - \
+            datetime.timedelta(0,12*60*60)
+            past_hour = '1200' if past_date.hour > 11 else '0'
+            past_forecast_date_timestep = "%s.%s" % (past_date.strftime("%Y%m%d"), past_hour)                                     
+            qinit_file = os.path.join(input_directory, 'Qinit_file_%s_%s.csv' % (basin_name, past_forecast_date_timestep))                                      
+            if os.path.exists(qinit_file):
+                qinit_fpath = '%s/Qinit_file_%s_%s.csv' % (watershed, basin_name,
+                                                              past_forecast_date_timestep)
             else:
                 qinit_fpath = None
             update_namelist_file(namelist_file, output_directory,
@@ -281,6 +286,8 @@ def make_iterator(args, lock, queue):
 if __name__ == "__main__":
     rapid_files_location = '/home/alan/work/rapid'
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
+    ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
+    ckan_api_key = '8dcc1b34-0e09-4ddc-8356-df4a24e5be87'
     #get list of watersheds in rapid directory
     #use only active watersheds
     #watersheds = [d[:-7] for d in dirs if d.endswith('-active')]
@@ -292,56 +299,78 @@ if __name__ == "__main__":
     #date_string = datetime.datetime(2015,1,27).strftime('%Y%m%d')
 
     #download all files for today
-    ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
-       'Runoff.'+date_string+'*.netcdf.tar.gz')
-    #ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
-        #'Runoff.'+date_string+'*.00.netcdf'))
+    #ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
+       #'Runoff.'+date_string+'*.netcdf.tar.gz')
+    ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
+        'Runoff.'+date_string+'*.00.netcdf'))
 
-    ecmwf_forecasts = []
     #prepare ECMWF files
-    for ecmwf_folder in ecmwf_folders:
-        ecmwf_forecasts += glob(os.path.join(ecmwf_folder,'*.runoff.netcdf'))
-    #make the largest files first
-    ecmwf_forecasts.sort(key=os.path.getsize, reverse=True)
     time_start_prepare = datetime.datetime.utcnow()
-
-    #loop prepare forecasts async multiple processes at a time if available
-    pool = multiprocessing.Pool()
-    lock = multiprocessing.Manager().Lock()
-    queue = multiprocessing.Manager().Queue()
-    combinations = list(itertools.product(watersheds, 
-                                          ecmwf_forecasts, 
-                                          [rapid_files_location]))
-    #chunksize=1 makes it so there is only one task per process
-    result = pool.imap(prepare_all_inflow_ECMWF, 
-                      make_iterator(combinations, lock, queue),
-                      chunksize=1)
-    pool.close()
-    pool.join()
+    for ecmwf_folder in ecmwf_folders:
+        ecmwf_forecasts = glob(os.path.join(ecmwf_folder,'*.runoff.netcdf'))
+        #make the largest files first
+        ecmwf_forecasts.sort(key=os.path.getsize, reverse=True)
+    
+        #loop prepare forecasts async multiple processes at a time if available
+        pool = multiprocessing.Pool()
+        lock = multiprocessing.Manager().Lock()
+        queue = multiprocessing.Manager().Queue()
+        combinations = list(itertools.product(watersheds, 
+                                              ecmwf_forecasts, 
+                                              [rapid_files_location]))
+        #chunksize=1 makes it so there is only one task per process
+        result = pool.imap(prepare_all_inflow_ECMWF, 
+                          make_iterator(combinations, lock, queue),
+                          chunksize=1)
+        pool.close()
+        pool.join()
+    
+    
+        #remove RAPID output files
+        rapid_output_files=glob(os.path.join(rapid_files_location,
+            'run','*_rapid_stdout.txt'))
+        for rapid_output_file in rapid_output_files:
+            try:
+                os.remove(rapid_output_file)
+            except OSError:
+                pass
+        
+        #remove intermediate files
+        for ecmwf_folder in ecmwf_folders:
+            ecmwf_file = glob(os.path.join(ecmwf_folder,'*.runoff.netcdf'))[0]
+            forecast_split = os.path.basename(ecmwf_file).split(".")
+            forecast_date_timestep = ".".join(forecast_split[0:2])
+            for watershed in watersheds:
+                rmtree(os.path.join(rapid_files_location, 'input', 
+                    watershed, forecast_date_timestep))
+        
+        #create new init flow files
+        for watershed in watersheds:
+            input_directory = os.path.join(rapid_files_location, 'input', watershed)
+            path_to_watershed_files = os.path.join(rapid_files_location, 'output', watershed)
+            forecast_date_timestep = None
+            #finds the current output from downscaled ECMWF forecasts
+            if os.path.exists(path_to_watershed_files):
+                forecast_date_timestep = sorted([d for d in os.listdir(path_to_watershed_files) \
+                                    if os.path.isdir(os.path.join(path_to_watershed_files, d))],
+                                     reverse=True)[0]
+            if forecast_date_timestep:
+                #loop through all the rapid_namelist files in directory
+                file_list = glob(os.path.join(input_directory,'rapid_namelist_*.dat'))
+                forecast_directory = os.path.join(path_to_watershed_files, forecast_date_timestep)
+                for namelist_file in file_list:
+                    basin_name = os.path.basename(namelist_file)[15:-4]
+                    basin_files = find_current_rapid_output(forecast_directory, basin_name)
+                    compute_initial_rapid_flows(basin_files, basin_name, input_directory, forecast_date_timestep)    
 
     time_finish_prepare = datetime.datetime.utcnow()
 
-    #remove RAPID output files
-    rapid_output_files=glob(os.path.join(rapid_files_location,
-        'run','*_rapid_stdout.txt'))
-    for rapid_output_file in rapid_output_files:
-        try:
-            os.remove(rapid_output_file)
-        except OSError:
-            pass
-    #remove intermediate files
-    for ecmwf_folder in ecmwf_folders:
-        ecmwf_file = glob(os.path.join(ecmwf_folder,'*.runoff.netcdf'))[0]
-        forecast_split = os.path.basename(ecmwf_file).split(".")
-        forecast_date_timestep = ".".join(forecast_split[0:2])
-        for watershed in watersheds:
-            rmtree(os.path.join(rapid_files_location, 'input', 
-                watershed, forecast_date_timestep))
     #upload new datasets
-    data_manager = erpf_dataset_manager('http://ciwckan.chpc.utah.edu',
-                                   '8dcc1b34-0e09-4ddc-8356-df4a24e5be87',
+    data_manager = erpf_dataset_manager(ckan_api_endpoint,
+                                   ckan_api_key,
                                    os.path.join(rapid_files_location, 'output'))
     data_manager.zip_upload_packages()
+
     #delete local datasets
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
