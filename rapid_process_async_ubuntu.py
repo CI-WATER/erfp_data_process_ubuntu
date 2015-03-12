@@ -291,7 +291,6 @@ if __name__ == "__main__":
     #get list of watersheds in rapid directory
     #use only active watersheds
     #watersheds = [d[:-7] for d in dirs if d.endswith('-active')]
-    
     watersheds = [d for d in os.listdir(os.path.join(rapid_files_location,'input')) \
                     if os.path.isdir(os.path.join(rapid_files_location,'input', d))]    
     time_begin_all = datetime.datetime.utcnow()
@@ -299,10 +298,10 @@ if __name__ == "__main__":
     #date_string = datetime.datetime(2015,1,27).strftime('%Y%m%d')
 
     #download all files for today
-    #ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
-       #'Runoff.'+date_string+'*.netcdf.tar.gz')
-    ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
-        'Runoff.'+date_string+'*.00.netcdf'))
+    ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
+       'Runoff.'+date_string+'*.netcdf.tar.gz')
+    #ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
+        #'Runoff.'+date_string+'*.00.netcdf'))
 
     #prepare ECMWF files
     time_start_prepare = datetime.datetime.utcnow()
@@ -343,7 +342,6 @@ if __name__ == "__main__":
             for watershed in watersheds:
                 rmtree(os.path.join(rapid_files_location, 'input', 
                     watershed, forecast_date_timestep))
-        
         #create new init flow files
         for watershed in watersheds:
             input_directory = os.path.join(rapid_files_location, 'input', watershed)
@@ -362,7 +360,6 @@ if __name__ == "__main__":
                     basin_name = os.path.basename(namelist_file)[15:-4]
                     basin_files = find_current_rapid_output(forecast_directory, basin_name)
                     compute_initial_rapid_flows(basin_files, basin_name, input_directory, forecast_date_timestep)    
-
     time_finish_prepare = datetime.datetime.utcnow()
 
     #upload new datasets
@@ -374,7 +371,6 @@ if __name__ == "__main__":
     #delete local datasets
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
-        
     time_end = datetime.datetime.utcnow()
     print "Time Begin All: " + str(time_begin_all)
     print "Time to Download: " + str(time_start_prepare - time_begin_all)
