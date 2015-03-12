@@ -129,7 +129,7 @@ class erpf_dataset_manager():
                                                     forecast_date=dataset_info['date_string'],
                                                     description="ECMWF-RAPID Flood Predicition Dataset")
             except Exception,e:
-                print "%s Upload Error: %s" % (dataset_info['file_to_upload'], e)
+                print "%s Upload Error: %s" % (resource_name, e)
                 pass
         else:
             print "Watershed dataset does not exist. Upload skipped."
