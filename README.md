@@ -25,8 +25,8 @@ $ pip install netCDF4
 ```
 ##Step 3: Install tethys_dataset_services
 ```
-pip install requests_toolbelt
-pip install tethys_dataset_services
+$ pip install requests_toolbelt
+$ pip install tethys_dataset_services
 ```
 ##Step 4: Download the source code
 ```
@@ -36,12 +36,12 @@ $ git clone https://github.com/CI-WATER/erfp_data_process_ubuntu.git
 ##Step 5: Create folders for RAPID input and for downloading ECMWF
 In this instance:
 ```
-cd /home/alan/
-mkdir work/rapid/input work/ecmwf work/logs
+$ cd /home/alan/
+$ mkdir work/rapid/input work/ecmwf work/logs
 ```
 ##Step 6: Change the locations in the files
 Go into *rapid_process_async_ubuntu.py* and change these variables for your instance:
-```
+```python
     rapid_files_location = '/home/alan/work/rapid'
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
     ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
@@ -52,8 +52,8 @@ Go into *rapid_process.sh* and change make sure the path locations and variables
 
 Example:
 ```
-chmod 554 rapid_process_async_ubuntu.py
-chmod 554 rapid_process.sh
+$ chmod 554 rapid_process_async_ubuntu.py
+$ chmod 554 rapid_process.sh
 ```
 ##Step 8: Add RAPID files to the work/rapid/input directory
 Example:
