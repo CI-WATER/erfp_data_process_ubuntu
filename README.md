@@ -75,5 +75,5 @@ See: http://askubuntu.com/questions/2368/how-do-i-set-up-a-cron-job
 
 You only need to run rapid_process.sh
 ```
-./rapid_process.sh
+$ ./rapid_process.sh
 ```
