@@ -23,6 +23,11 @@ $ yum install netcdf-devel
 $ pip install numpy
 $ pip install netCDF4
 ```
+##Step 4: Install tethys_dataset_services
+```
+pip install requests_toolbelt
+pip install tethys_dataset_services
+```
 ##Step 3: Download the source code
 ```
 $ cd /path/to/your/scripts/
@@ -36,7 +41,7 @@ mkdir work/rapid/input
 mkdir work/ecmwf
 ```
 ##Step 5: Change the locations in the files
-Go into *rapid_process_async_ubuntu.py* and change these variables to the appropriate locations:
+Go into *rapid_process_async_ubuntu.py* and change these variables for your instance:
 ```
     rapid_files_location = '/home/alan/work/rapid'
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
