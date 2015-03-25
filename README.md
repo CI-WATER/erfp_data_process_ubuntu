@@ -61,3 +61,8 @@ $ ls work/rapid/input/huc_region_1209
 ```
 ##Step 7: Create CRON job to run the scripts twice daily
 See: http://askubuntu.com/questions/2368/how-do-i-set-up-a-cron-job
+
+You only need to run rapid_process.sh
+```
+./rapid_process.sh
+```
