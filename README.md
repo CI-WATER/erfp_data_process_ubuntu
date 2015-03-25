@@ -37,8 +37,7 @@ $ git clone https://github.com/CI-WATER/erfp_data_process_ubuntu.git
 In this instance:
 ```
 cd /home/alan/
-mkdir work/rapid/input
-mkdir work/ecmwf
+mkdir work/rapid/input work/ecmwf work/logs
 ```
 ##Step 6: Change the locations in the files
 Go into *rapid_process_async_ubuntu.py* and change these variables for your instance:
