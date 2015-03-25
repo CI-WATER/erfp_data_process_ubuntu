@@ -23,24 +23,24 @@ $ yum install netcdf-devel
 $ pip install numpy
 $ pip install netCDF4
 ```
-##Step 4: Install tethys_dataset_services
+##Step 3: Install tethys_dataset_services
 ```
 pip install requests_toolbelt
 pip install tethys_dataset_services
 ```
-##Step 3: Download the source code
+##Step 4: Download the source code
 ```
 $ cd /path/to/your/scripts/
 $ git clone https://github.com/CI-WATER/erfp_data_process_ubuntu.git
 ```
-##Step 4: Create folders for RAPID input and for downloading ECMWF
+##Step 5: Create folders for RAPID input and for downloading ECMWF
 In this instance:
 ```
 cd /home/alan/
 mkdir work/rapid/input
 mkdir work/ecmwf
 ```
-##Step 5: Change the locations in the files
+##Step 6: Change the locations in the files
 Go into *rapid_process_async_ubuntu.py* and change these variables for your instance:
 ```
     rapid_files_location = '/home/alan/work/rapid'
@@ -49,14 +49,14 @@ Go into *rapid_process_async_ubuntu.py* and change these variables for your inst
     ckan_api_key = 'areally-good-key'
 ```
 Go into *rapid_process.sh* and change make sure the path locations and variables are correct for your instance.
-##Step 6: Make sure permissions are correct for these files and any directories the script will use
+##Step 7: Make sure permissions are correct for these files and any directories the script will use
 
 Example:
 ```
 chmod 554 rapid_process_async_ubuntu.py
 chmod 554 rapid_process.sh
 ```
-##Step 7: Add RAPID files to the work/rapid/input directory
+##Step 8: Add RAPID files to the work/rapid/input directory
 Example:
 ```
 $ ls work/rapid/input
@@ -71,7 +71,7 @@ $ ls work/rapid/input/huc_region_1209
 -rw-r--r-- 1 alan alan 1.2M Mar  9 08:03 weight_low_res.csv
 -rwxr-xr-x 1 alan alan  55K Mar  6 10:01 x.csv
 ```
-##Step 8: Create CRON job to run the scripts twice daily
+##Step 9: Create CRON job to run the scripts twice daily
 See: http://askubuntu.com/questions/2368/how-do-i-set-up-a-cron-job
 
 You only need to run rapid_process.sh
