@@ -61,15 +61,15 @@ Example:
 ```
 $ ls work/rapid/input
 huc_region_1209
-$ ls work/rapid/input/huc_region_1209
--rwxr-xr-x 1 alan alan 163K Mar  6 10:01 k.csv
--rwxr-xr-x 1 alan alan 163K Mar  6 10:01 kfac.csv
--rwxr-xr-x 1 alan alan 340K Mar  6 19:22 rapid_connect.csv
--rw------- 1 alan alan 5.1K Mar 25 04:15 rapid_namelist_huc_4_1209.dat
--rwxr-xr-x 1 alan alan  99K Mar  9 07:52 riv_bas_id_huc_4_1209.csv
--rw-r--r-- 1 alan alan 1.5M Mar  9 08:03 weight_high_res.csv
--rw-r--r-- 1 alan alan 1.2M Mar  9 08:03 weight_low_res.csv
--rwxr-xr-x 1 alan alan  55K Mar  6 10:01 x.csv
+$ ls -lh work/rapid/input/huc_region_1209
+-r--r--r-- 1 alan alan 163K Mar  6 10:01 k.csv
+-r--r--r-- 1 alan alan 163K Mar  6 10:01 kfac.csv
+-r--r--r-- 1 alan alan 340K Mar  6 19:22 rapid_connect.csv
+-rw-r--r-- 1 alan alan 5.1K Mar 25 04:15 rapid_namelist_huc_4_1209.dat
+-r--r--r-- 1 alan alan  99K Mar  9 07:52 riv_bas_id_huc_4_1209.csv
+-r--r--r-- 1 alan alan 1.5M Mar  9 08:03 weight_high_res.csv
+-r--r--r-- 1 alan alan 1.2M Mar  9 08:03 weight_low_res.csv
+-r--r--r-- 1 alan alan  55K Mar  6 10:01 x.csv
 ```
 ##Step 9: Create CRON job to run the scripts twice daily
 See: http://askubuntu.com/questions/2368/how-do-i-set-up-a-cron-job
