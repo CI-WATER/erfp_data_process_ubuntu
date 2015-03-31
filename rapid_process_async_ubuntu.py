@@ -138,14 +138,6 @@ def update_namelist_file(namelist_file, output_directory, vlat_file,
     #Move new file
     move(abs_path, namelist_file)
 
-def run_RAPID(args):
-    forecast = args[0][1]
-    forecast_split = os.path.basename(forecast).split(".")
-    forecast_date_timestep = ".".join(forecast_split[:2])
-    ensemble_number = int(forecast_split[2])
-    run_RAPID_single_watershed(args[0][2], args[0][0], forecast_date_timestep,
-                               ensemble_number, args[1],args[2])
-
 def run_RAPID_single_watershed(rapid_files_location, watershed, 
                                forecast_date_timestep, ensemble_number,
                                lock, queue):
@@ -164,7 +156,7 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
             os.makedirs(output_directory)
 
         lock.acquire() #make sure no overlap occurs
-        print "Lock Aquired %s %s %s" % (watershed, basin_name, ensemble_number)
+
         #remove link to old RAPID namelist file
         old_namelist_file = os.path.join(rapid_files_location,
             'run','rapid_namelist')
@@ -194,6 +186,8 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
                                                               past_forecast_date_timestep)
             else:
                 qinit_fpath = None
+                
+            #update namelist file for current run    
             update_namelist_file(namelist_file, output_directory,
                     vlat_fpath, qout_fpath, qinit_fpath, ensemble_number)
 
@@ -205,20 +199,17 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
                 'run', 'rapid_namelist').replace("\\","/")
                 )
             
-            
             #run RAPID
             print "Running RAPID for: %s Ensemble: %s" % (basin_name, ensemble_number)
-            #os.system(os.path.join(rapid_files_location,'run',
-            #    'run_rapid.sh').replace("\\","/")
-            #    )
+
             process = subprocess.Popen([os.path.join(rapid_files_location,'run',
                 'run_rapid.sh').replace("\\","/")], shell=True)
                 
             sleep(2) #give rapid time to read namelist file
+
             lock.release()
-            print "Lock Released %s %s %s" % (watershed, basin_name, ensemble_number)
             queue.put(process)
-            process.communicate()
+            process.communicate() #wait for RAPID to finish
         
         except Exception as ex:
             #skip the run
@@ -240,45 +231,66 @@ def prepare_all_inflow_ECMWF(args):
     ensemble_number = int(forecast_split[2])
     directory_path = os.path.join(rapid_files_location, 'input', 
         watershed)
+
+    #create infloe directory if does not exist
     inflow_directory = os.path.join(directory_path, forecast_date_timestep)
-    if not os.path.exists(inflow_directory):
+    try:
         os.mkdir(inflow_directory)
-    inflow_file_name = 'm3_riv_bas_'+ str(ensemble_number) + '.nc'
+    except OSError:
+        pass
+    
+    inflow_file_name = 'm3_riv_bas_%s.nc' % ensemble_number
     output_rapid_inflow_file = os.path.join(inflow_directory, 
         inflow_file_name)
-    #determine weight table from resolution
+    
+    #determine weight table from resolution (52 is high resolution)
     weight_table_file = 'weight_low_res.csv'
     if ensemble_number == 52:
         weight_table_file = 'weight_high_res.csv'
-        
-    in_weight_table = os.path.join(directory_path, weight_table_file) 
-    time_start = datetime.datetime.utcnow()
-    #prepare ECMWF file for RAPID
-    print "Computing Inflow ECMWF for RAPID. Watershed: " + watershed + \
-        " " + forecast_date_timestep + " " + str(ensemble_number) + "... "
+    in_weight_table = os.path.join(directory_path, weight_table_file)
+    
+    time_start_all = datetime.datetime.utcnow()
     try:
+        #prepare ECMWF file for RAPID
         #optional argument ... time interval?
+        print "Computing Inflow ECMWF for RAPID. Watershed: %s %s %s  ..." % \
+            (watershed, forecast_date_timestep, ensemble_number)
         RAPIDinflowECMWF_tool = CreateInflowFileFromECMWFRunoff()
         RAPIDinflowECMWF_tool.execute(forecast, 
             in_weight_table, output_rapid_inflow_file)
+
+        time_end_ecmwf = datetime.datetime.utcnow()
+
+        #run RAPID
+        print "Running RAPID. Watershed: %s %s %s  ..." % \
+            (watershed, forecast_date_timestep, ensemble_number)
         run_RAPID_single_watershed(rapid_files_location, watershed, 
                                forecast_date_timestep, ensemble_number,
                                lock, queue)
     except Exception as ex:
         print ex
-        print "Skipping RAPID analysis for " + watershed + " " + \
-            forecast_date_timestep + " " + str(ensemble_number) + "..."
+        print "Skipping RAPID analysis for %s %s %s  ..." % \
+            (watershed, forecast_date_timestep, ensemble_number)
         return False
-    time_to_compute = datetime.datetime.utcnow() - time_start
-    print "Watershed: " + watershed + " " + forecast_date_timestep + " " + str(ensemble_number) + \
-        " ... Time to Compute: " + str(time_to_compute)
+    
+    #record compute times    
+    time_end_all = datetime.datetime.utcnow()
+    print "Watershed: %s %s %s Time to Compute: %s ..." % \
+        (watershed, forecast_date_timestep, ensemble_number, time_end_all - time_start_all)
+    print "Watershed: %s %s %s Time to Downscale ECMWF: %s ..." % \
+        (watershed, forecast_date_timestep, ensemble_number, time_end_ecmwf-time_start_all)
+    print "Watershed: %s %s %s Time to run RAPID: %s ..." % \
+        (watershed, forecast_date_timestep, ensemble_number, time_end_all-time_end_ecmwf)
 
     return output_rapid_inflow_file
     
             
 def make_iterator(args, lock, queue):
-    """Makes an iterator over args and passes the lock an queue to each element."""
-    return ((arg, lock, queue) for arg in args)   
+    """
+    Makes an iterator over args and passes the lock an queue to each element.
+    """
+    return ((arg, lock, queue) for arg in args)  
+    
 #------------------------------------------------------------------------------
 #main process
 #------------------------------------------------------------------------------
@@ -288,9 +300,10 @@ if __name__ == "__main__":
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
     ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
     ckan_api_key = '8dcc1b34-0e09-4ddc-8356-df4a24e5be87'
+    download_ecmwf = False
+    initialize_flows = False
+
     #get list of watersheds in rapid directory
-    #use only active watersheds
-    #watersheds = [d[:-7] for d in dirs if d.endswith('-active')]
     watersheds = [d for d in os.listdir(os.path.join(rapid_files_location,'input')) \
                     if os.path.isdir(os.path.join(rapid_files_location,'input', d))]    
     time_begin_all = datetime.datetime.utcnow()
@@ -298,10 +311,12 @@ if __name__ == "__main__":
     #date_string = datetime.datetime(2015,1,27).strftime('%Y%m%d')
 
     #download all files for today
-    ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
-       'Runoff.'+date_string+'*.netcdf.tar.gz')
-    #ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
-        #'Runoff.'+date_string+'*.00.netcdf'))
+    if download_ecmwf:
+        ecmwf_folders = ftp_ecmwf_download.download_all_ftp(ecmwf_forecast_location,
+                                                            'Runoff.%s*.netcdf.tar.gz' % date_string)
+    else:
+        ecmwf_folders = glob(os.path.join(ecmwf_forecast_location,
+                                          'Runoff.'+date_string+'*.netcdf'))
 
     #prepare ECMWF files
     time_start_prepare = datetime.datetime.utcnow()
@@ -342,24 +357,28 @@ if __name__ == "__main__":
             for watershed in watersheds:
                 rmtree(os.path.join(rapid_files_location, 'input', 
                     watershed, forecast_date_timestep))
-        #create new init flow files
-        for watershed in watersheds:
-            input_directory = os.path.join(rapid_files_location, 'input', watershed)
-            path_to_watershed_files = os.path.join(rapid_files_location, 'output', watershed)
-            forecast_date_timestep = None
-            #finds the current output from downscaled ECMWF forecasts
-            if os.path.exists(path_to_watershed_files):
-                forecast_date_timestep = sorted([d for d in os.listdir(path_to_watershed_files) \
-                                    if os.path.isdir(os.path.join(path_to_watershed_files, d))],
-                                     reverse=True)[0]
-            if forecast_date_timestep:
-                #loop through all the rapid_namelist files in directory
-                file_list = glob(os.path.join(input_directory,'rapid_namelist_*.dat'))
-                forecast_directory = os.path.join(path_to_watershed_files, forecast_date_timestep)
-                for namelist_file in file_list:
-                    basin_name = os.path.basename(namelist_file)[15:-4]
-                    basin_files = find_current_rapid_output(forecast_directory, basin_name)
-                    compute_initial_rapid_flows(basin_files, basin_name, input_directory, forecast_date_timestep)    
+        #initialize flows for next run
+        if initialize_flows:
+            #create new init flow files
+            for watershed in watersheds:
+                input_directory = os.path.join(rapid_files_location, 'input', watershed)
+                path_to_watershed_files = os.path.join(rapid_files_location, 'output', watershed)
+                forecast_date_timestep = None
+                #finds the current output from downscaled ECMWF forecasts
+                if os.path.exists(path_to_watershed_files):
+                    forecast_date_timestep = sorted([d for d in os.listdir(path_to_watershed_files) \
+                                        if os.path.isdir(os.path.join(path_to_watershed_files, d))],
+                                         reverse=True)[0]
+                if forecast_date_timestep:
+                    #loop through all the rapid_namelist files in directory
+                    file_list = glob(os.path.join(input_directory,'rapid_namelist_*.dat'))
+                    forecast_directory = os.path.join(path_to_watershed_files, forecast_date_timestep)
+                    for namelist_file in file_list:
+                        basin_name = os.path.basename(namelist_file)[15:-4]
+                        basin_files = find_current_rapid_output(forecast_directory, basin_name)
+                        compute_initial_rapid_flows(basin_files, basin_name, 
+                                                    input_directory, forecast_date_timestep)  
+    
     time_finish_prepare = datetime.datetime.utcnow()
 
     #upload new datasets
@@ -372,9 +391,11 @@ if __name__ == "__main__":
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
     time_end = datetime.datetime.utcnow()
-    print "Time Begin All: " + str(time_begin_all)
-    print "Time to Download: " + str(time_start_prepare - time_begin_all)
-    print "Time Start Prepare: " + str(time_start_prepare)
-    print "Time Finish All: " + str(time_finish_prepare - time_start_prepare)
-    print "Time Finish All: " + str(time_end)
-    print "TOTAL TIME: "  + str(time_end-time_begin_all)
+    
+    #print time to complete all
+    print "Time Begin All: ", time_begin_all
+    print "Time to Download: ", (time_start_prepare - time_begin_all)
+    print "Time Start Prepare: ", time_start_prepare
+    print "Time to Prepare: ", (time_finish_prepare - time_start_prepare)
+    print "Time Finish All: ", time_end
+    print "TOTAL TIME: ", (time_end-time_begin_all)
