@@ -22,7 +22,7 @@ def find_current_rapid_output(forecast_directory, basin_name):
     Finds the most current files output from RAPID
     """
     if os.path.exists(forecast_directory):
-        basin_files = glob(os.path.join(forecast_directory,"*"+basin_name+"*.nc"))
+        basin_files = glob(os.path.join(forecast_directory,"Qout_%s_*.nc" % basin_name))
         if len(basin_files) >0:
             return basin_files
     #there are none found
@@ -80,6 +80,8 @@ def compute_initial_rapid_flows(basin_ensemble_files, basin_name, input_director
         writer = csv.writer(csv_file)
         writer.writerows(initial_flows)
         csv_file.close()
+    else:
+        print "No ensembles for basin found"
      
      
 def update_namelist_file(namelist_file, output_directory, vlat_file, 
@@ -103,29 +105,26 @@ def update_namelist_file(namelist_file, output_directory, vlat_file,
     fh, abs_path = mkstemp()
     new_file = open(abs_path,'w')
     for line in old_file:
-        if 'BS_opt_Qinit' in line:
+        if line.strip().startswith('BS_opt_Qinit'):
             if (qinit_file):
                 new_file.write('BS_opt_Qinit       =.true.\n')
             else:
                 new_file.write('BS_opt_Qinit       =.false.\n')
-        elif 'Vlat_file' in line:
-            new_file.write('Vlat_file          = \'../../rapid/input/' + \
-                vlat_file + '\'\n')
-        elif 'Qout_file' in line:
-            new_file.write('Qout_file          = \'../../rapid/output/' + \
-                qout_file + '\'\n')
-        elif 'ZS_TauM' in line:
-            new_file.write('ZS_TauM            = ' + str(duration) + '\n')
-        elif 'ZS_dtM' in line:
-            new_file.write('ZS_dtM             = ' + str(86400) + '\n')
-        elif 'ZS_TauR' in line:
-            new_file.write('ZS_TauR            = ' + str(interval) + '\n')
-        elif 'Qinit_file' in line:
+        elif line.strip().startswith('Vlat_file'):
+            new_file.write('Vlat_file          =\'../../rapid/input/%s\'\n' % vlat_file)
+        elif line.strip().startswith('Qout_file'):
+            new_file.write('Qout_file          =\'../../rapid/output/%s\'\n' % qout_file)
+        elif line.strip().startswith('ZS_TauM'):
+            new_file.write('ZS_TauM            =%s\n' % duration)
+        elif line.strip().startswith('ZS_dtM'):
+            new_file.write('ZS_dtM             =%s\n' % 86400)
+        elif line.strip().startswith('ZS_TauR'):
+            new_file.write('ZS_TauR            =%s\n' % interval)
+        elif line.strip().startswith('Qinit_file'):
             if (qinit_file):
-                new_file.write('Qinit_file          = \'../../rapid/input/' + \
-                    qinit_file + '\'\n')
+                new_file.write('Qinit_file          =\'../../rapid/input/%s\'\n' % qinit_file)
             else:
-                new_file.write('Qinit_file          = \'\'\n')
+                new_file.write('Qinit_file          =\'\'\n')
         else:
             new_file.write(line)
              
@@ -150,10 +149,14 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
     file_list = glob(os.path.join(input_directory,'rapid_namelist_*.dat'))
     for namelist_file in file_list:
         basin_name = os.path.basename(namelist_file)[15:-4]
+            
+        #make output dir if does not exist
         output_directory = os.path.join(rapid_files_location,
             'output', watershed, forecast_date_timestep)
-        if not os.path.exists(output_directory):
+        try:
             os.makedirs(output_directory)
+        except OSError:
+            pass
 
         lock.acquire() #make sure no overlap occurs
 
@@ -301,11 +304,11 @@ if __name__ == "__main__":
     ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
     ckan_api_key = '8dcc1b34-0e09-4ddc-8356-df4a24e5be87'
     download_ecmwf = False
-    initialize_flows = False
+    initialize_flows = True
 
     #get list of watersheds in rapid directory
     watersheds = [d for d in os.listdir(os.path.join(rapid_files_location,'input')) \
-                    if os.path.isdir(os.path.join(rapid_files_location,'input', d))]    
+                    if os.path.isdir(os.path.join(rapid_files_location,'input', d))]  
     time_begin_all = datetime.datetime.utcnow()
     date_string = time_begin_all.strftime('%Y%m%d')
     #date_string = datetime.datetime(2015,1,27).strftime('%Y%m%d')
@@ -361,6 +364,7 @@ if __name__ == "__main__":
         if initialize_flows:
             #create new init flow files
             for watershed in watersheds:
+                print "Initializing flows for ", watershed
                 input_directory = os.path.join(rapid_files_location, 'input', watershed)
                 path_to_watershed_files = os.path.join(rapid_files_location, 'output', watershed)
                 forecast_date_timestep = None
@@ -390,8 +394,8 @@ if __name__ == "__main__":
     #delete local datasets
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
+
     time_end = datetime.datetime.utcnow()
-    
     #print time to complete all
     print "Time Begin All: ", time_begin_all
     print "Time to Download: ", (time_start_prepare - time_begin_all)

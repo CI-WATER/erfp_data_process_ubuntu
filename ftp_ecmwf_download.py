@@ -18,13 +18,13 @@ def ftp_connect():
     
 def remove_old_ftp_downloads(folder):
     """
-    remove files/folders older than 2 days old
+    remove files/folders older than 1 day old
     """
     date_now = datetime.datetime.utcnow()
     all_paths = glob(os.path.join(folder,'Runoff*netcdf*'))
     for path in all_paths:
         date_file = datetime.datetime.strptime(os.path.basename(path).split('.')[1],'%Y%m%d')
-        if date_now - date_file > datetime.timedelta(2):
+        if date_now - date_file > datetime.timedelta(1):
             if os.path.isdir(path):
                 rmtree(path)
             else:
