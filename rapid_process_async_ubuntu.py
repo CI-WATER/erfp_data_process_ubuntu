@@ -12,7 +12,7 @@ from time import sleep
 from shutil import move, rmtree
 import ftp_ecmwf_download
 from CreateInflowFileFromECMWFRunoff import CreateInflowFileFromECMWFRunoff
-from dataset_upload import erpf_dataset_manager
+from sfpt_dataset_manager.dataset_manager import ECMWFRAPIDDatasetManager
 
 #------------------------------------------------------------------------------
 #functions
@@ -303,7 +303,7 @@ if __name__ == "__main__":
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
     ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
     ckan_api_key = '8dcc1b34-0e09-4ddc-8356-df4a24e5be87'
-    download_ecmwf = False
+    download_ecmwf = True
     initialize_flows = True
 
     #get list of watersheds in rapid directory
@@ -360,6 +360,7 @@ if __name__ == "__main__":
             for watershed in watersheds:
                 rmtree(os.path.join(rapid_files_location, 'input', 
                     watershed, forecast_date_timestep))
+
         #initialize flows for next run
         if initialize_flows:
             #create new init flow files
@@ -384,17 +385,17 @@ if __name__ == "__main__":
                                                     input_directory, forecast_date_timestep)  
     
     time_finish_prepare = datetime.datetime.utcnow()
-
+ 
     #upload new datasets
-    data_manager = erpf_dataset_manager(ckan_api_endpoint,
-                                   ckan_api_key,
-                                   os.path.join(rapid_files_location, 'output'))
-    data_manager.zip_upload_packages()
-
+    data_manager = ECMWFRAPIDDatasetManager(ckan_api_endpoint,
+                                            ckan_api_key)
+                                            
+    data_manager.zip_upload_resources(os.path.join(rapid_files_location, 'output'))
+    """
     #delete local datasets
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
-
+    """
     time_end = datetime.datetime.utcnow()
     #print time to complete all
     print "Time Begin All: ", time_begin_all
