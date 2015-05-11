@@ -32,6 +32,8 @@ $ pip install tethys_dataset_services
 ```
 $ cd /path/to/your/scripts/
 $ git clone https://github.com/CI-WATER/erfp_data_process_ubuntu.git
+$ git submodule init
+$ git submodule update
 ```
 ##Step 5: Create folders for RAPID input and for downloading ECMWF
 In this instance:
