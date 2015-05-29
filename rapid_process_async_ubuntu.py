@@ -206,7 +206,7 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
             print "Running RAPID for: %s Ensemble: %s" % (basin_name, ensemble_number)
 
             process = subprocess.Popen([os.path.join(rapid_files_location,'run',
-                'rapid').replace("\\","/")], shell=True)
+                'run_rapid.sh').replace("\\","/")], shell=True)
                 
             sleep(2) #give rapid time to read namelist file
 
