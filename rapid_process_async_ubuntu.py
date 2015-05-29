@@ -206,7 +206,7 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
             print "Running RAPID for: %s Ensemble: %s" % (basin_name, ensemble_number)
 
             process = subprocess.Popen([os.path.join(rapid_files_location,'run',
-                'run_rapid.sh').replace("\\","/")], shell=True)
+                'rapid').replace("\\","/")], shell=True)
                 
             sleep(2) #give rapid time to read namelist file
 
@@ -303,8 +303,8 @@ if __name__ == "__main__":
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
     ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
     ckan_api_key = '8dcc1b34-0e09-4ddc-8356-df4a24e5be87'
-    download_ecmwf = True
-    initialize_flows = True
+    download_ecmwf = False
+    initialize_flows = False
 
     #get list of watersheds in rapid directory
     watersheds = [d for d in os.listdir(os.path.join(rapid_files_location,'input')) \
@@ -391,11 +391,11 @@ if __name__ == "__main__":
                                             ckan_api_key)
                                             
     data_manager.zip_upload_resources(os.path.join(rapid_files_location, 'output'))
-    """
+
     #delete local datasets
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
-    """
+
     time_end = datetime.datetime.utcnow()
     #print time to complete all
     print "Time Begin All: ", time_begin_all
