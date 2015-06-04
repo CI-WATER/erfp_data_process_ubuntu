@@ -85,3 +85,13 @@ You only need to run rapid_process.sh
 ```
 $ ./rapid_process.sh
 ```
+#Troubleshooting
+If you see this error:
+ImportError: No module named packages.urllib3.poolmanager
+```
+$ pip install pip --upgrade
+```
+Restart your terminal
+```
+$ pip install requests --upgrade
+```
