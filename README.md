@@ -7,6 +7,12 @@ $ apt-get install gfortran g++
 ```
 Follow the instructions on page 10-14: http://rapid-hub.org/docs/RAPID_Azure.pdf.
 
+Add run_rapid.sh to the rapid/run directory with the lines:
+```
+cd /home/alan/work/rapid/run/
+./rapid
+```
+
 ##Step 2: Install netCDF4-python
 ###Install on Ubuntu:
 ```
@@ -78,4 +84,14 @@ See: http://askubuntu.com/questions/2368/how-do-i-set-up-a-cron-job
 You only need to run rapid_process.sh
 ```
 $ ./rapid_process.sh
+```
+#Troubleshooting
+If you see this error:
+ImportError: No module named packages.urllib3.poolmanager
+```
+$ pip install pip --upgrade
+```
+Restart your terminal
+```
+$ pip install requests --upgrade
 ```
