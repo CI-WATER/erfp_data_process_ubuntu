@@ -351,7 +351,7 @@ if __name__ == "__main__":
                     if os.path.isdir(os.path.join(rapid_files_location,'input', d))]  
     time_begin_all = datetime.datetime.utcnow()
     date_string = time_begin_all.strftime('%Y%m%d')
-    date_string = datetime.datetime(2015,5,29).strftime('%Y%m%d')
+    #date_string = datetime.datetime(2015,6,6).strftime('%Y%m%d')
 
     #download all files for today
     if download_ecmwf:
