@@ -28,13 +28,38 @@ def find_current_rapid_output(forecast_directory, basin_name):
     #there are none found
     return None
 
-def compute_initial_rapid_flows(basin_ensemble_files, basin_name, input_directory, forecast_date_timestep):
+def csv_to_list(csv_file, delimiter=','):
     """
-    Gets mean of all 52 ensembles 12-hrs ago and prints to csv as initial flow
+    Reads in a CSV file and returns the contents as list,
+    where every row is stored as a sublist, and each element
+    in the sublist represents 1 cell in the table.
+
+    """
+    with open(csv_file, 'rb') as csv_con:
+        reader = csv.reader(csv_con, delimiter=delimiter)
+        return list(reader)
+
+def get_comids_in_netcdf_file(reach_id_list, prediction_file):
+    """
+    Gets the subset comid_index_list, reordered_comid_list from the netcdf file
+    """
+    data_nc = NET.Dataset(prediction_file, mode="r")
+    com_ids = data_nc.variables['COMID'][:]
+    data_nc.close()
+    try:
+        #get where comids are in netcdf file
+        netcdf_reach_indices_list = np.where(np.in1d(com_ids, reach_id_list))[0]
+    except Exception as ex:
+        print ex
+
+    return netcdf_reach_indices_list, com_ids[netcdf_reach_indices_list]
+
+def compute_initial_rapid_flows(prediction_files, basin_name, input_directory, forecast_date_timestep):
+    """
+    Gets mean of all 52 ensembles 12-hrs in future and prints to csv as initial flow
     Qinit_file (BS_opt_Qinit)
-    Qfinal_file (BS_opt_Qfinal)
-    The assumptions are that Qinit_file is ordered the same way as rapid_connect_file, 
-    and that Qfinal_file (produced when RAPID runs) is ordered the same way as your riv_bas_id_file.  
+    The assumptions are that Qinit_file is ordered the same way as rapid_connect_file
+    if subset of list, add zero where there is no flow
     """
     #remove old init files for this basin
     past_init_flow_files = glob(os.path.join(input_directory, 'Qinit_file_%s_*.csv' % basin_name))
@@ -44,42 +69,57 @@ def compute_initial_rapid_flows(basin_ensemble_files, basin_name, input_director
         except:
             pass
 
-
     init_file_location = os.path.join(input_directory,'Qinit_file_%s_%s.csv' % (basin_name, forecast_date_timestep))
-    #check to see if basin ensemble files exist
-    if basin_ensemble_files:
-        #collect data into matrix
-        all_data_series = []
-        reach_ids = []
-        for in_nc in basin_ensemble_files:
-            data_nc = NET.Dataset(in_nc)
-            qout = data_nc.variables['Qout']
-            #get flow at 12 hr time step for all reaches
-            dataValues = qout[2,:].clip(min=0)
-            if (len(reach_ids) <= 0):
-                reach_ids = data_nc.variables['COMID'][:]
-            all_data_series.append(dataValues)
-            data_nc.close()
-        #get mean of each reach at time step
-        mean_data = np.array(np.matrix(all_data_series).mean(0).T)
-        #add zeros for reaches not in subbasin
-        rapid_connect_file = open(os.path.join(input_directory,'rapid_connect.csv'))
-        all_reach_ids = []
-        for row in rapid_connect_file:
-            all_reach_ids.append(int(row.split(",")[0]))
+    #check to see if exists and only perform operation once
+    if prediction_files:
+        #get list of COMIDS
+        connectivity_file = csv_to_list(os.path.join(input_directory,'rapid_connect.csv'))
+        comid_list = np.array([int(row[0]) for row in connectivity_file])
 
-        #if the reach is not in the subbasin initialize it with zero
-        initial_flows = np.array(np.zeros((1,len(all_reach_ids)), dtype='float32').T)
-        subbasin_reach_index = 0
-        for reach_id in reach_ids:
-            new_index = all_reach_ids.index(reach_ids[subbasin_reach_index])
-            initial_flows[:][new_index] = mean_data[:][subbasin_reach_index]
-            subbasin_reach_index+=1
-        #print to csv file
-        csv_file = open(init_file_location,"wb")
-        writer = csv.writer(csv_file)
-        writer.writerows(initial_flows)
-        csv_file.close()
+
+        print "Finding COMID indices ..."
+        comid_index_list, reordered_comid_list = get_comids_in_netcdf_file(comid_list, prediction_files[0])
+        print "Extracting Data ..."
+        reach_prediciton_array = np.zeros((len(comid_list),len(prediction_files),1))
+        #get information from datasets
+        for file_index, prediction_file in enumerate(prediction_files):
+            try:
+                #Get hydrograph data from ECMWF Ensemble
+                data_nc = NET.Dataset(prediction_file, mode="r")
+                qout_dimensions = data_nc.variables['Qout'].dimensions
+                if qout_dimensions[0] == 'Time' and qout_dimensions[1] == 'COMID':
+                    data_values_2d_array = data_nc.variables['Qout'][:,comid_index_list].transpose()
+                    for comid_index, comid in enumerate(reordered_comid_list):
+                        reach_prediciton_array[comid_index][file_index] = data_values_2d_array[comid_index][2]
+                else:
+                    print "Invalid ECMWF forecast file", prediction_file
+                    data_nc.close()
+                    continue
+                data_nc.close()
+
+            except Exception, e:
+                print e
+                #pass
+
+        print "Analyzing Data ..."
+        output_data = []
+        for comid in comid_list:
+            try:
+                #get where comids are in netcdf file
+                comid_index = np.where(reordered_comid_list==comid)[0][0]
+            except Exception:
+                #comid not found in list. Adding zero init flow ...
+                output_data.append([0])
+                pass
+                continue
+
+            #get mean of series as init flow
+            output_data.append([np.mean(reach_prediciton_array[comid_index])])
+
+        print "Writing Output ..."
+        with open(init_file_location, 'wb') as outfile:
+            writer = csv.writer(outfile)
+            writer.writerows(output_data)
     else:
         print "No ensembles for basin found"
      
@@ -208,7 +248,7 @@ def run_RAPID_single_watershed(rapid_files_location, watershed,
             process = subprocess.Popen([os.path.join(rapid_files_location,'run',
                 'run_rapid.sh').replace("\\","/")], shell=True)
                 
-            sleep(2) #give rapid time to read namelist file
+            sleep(4) #give rapid time to read namelist file
 
             lock.release()
             queue.put(process)
@@ -303,15 +343,15 @@ if __name__ == "__main__":
     ecmwf_forecast_location = "/home/alan/work/ecmwf"
     ckan_api_endpoint = 'http://ciwckan.chpc.utah.edu'
     ckan_api_key = '8dcc1b34-0e09-4ddc-8356-df4a24e5be87'
-    download_ecmwf = False
-    initialize_flows = False
+    download_ecmwf = True
+    initialize_flows = True
 
     #get list of watersheds in rapid directory
     watersheds = [d for d in os.listdir(os.path.join(rapid_files_location,'input')) \
                     if os.path.isdir(os.path.join(rapid_files_location,'input', d))]  
     time_begin_all = datetime.datetime.utcnow()
     date_string = time_begin_all.strftime('%Y%m%d')
-    #date_string = datetime.datetime(2015,1,27).strftime('%Y%m%d')
+    date_string = datetime.datetime(2015,5,29).strftime('%Y%m%d')
 
     #download all files for today
     if download_ecmwf:
@@ -391,7 +431,6 @@ if __name__ == "__main__":
                                             ckan_api_key)
                                             
     data_manager.zip_upload_resources(os.path.join(rapid_files_location, 'output'))
-
     #delete local datasets
     for item in os.listdir(os.path.join(rapid_files_location, 'output')):
         rmtree(os.path.join(rapid_files_location, 'output', item))
