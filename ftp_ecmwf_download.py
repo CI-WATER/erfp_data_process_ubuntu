@@ -11,7 +11,7 @@ def ftp_connect():
     Connect to ftp site
     """
     ftp = ftplib.FTP('ftp.ecmwf.int')
-    ftp.login('safer','neo2008')
+    ftp.login('','')
     ftp.cwd('tcyc')
     ftp.set_debuglevel(1)
     return ftp
